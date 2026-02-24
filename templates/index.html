@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Crypto Ticker TradingView Style</title>
+<style>
+    body { margin: 0; font-family: Arial; background: #f4f4f4; }
+    h2 { text-align: center; margin-top: 20px; }
+    #chart-container { display: flex; flex-direction: column; height: 600px; }
+    #chart { flex: 3; }
+    #volume { flex: 1; }
+</style>
+</head>
+<body>
+<h2>Crypto Ticker Realtime</h2>
+<div id="chart-container">
+    <div id="chart"></div>
+    <div id="volume"></div>
+</div>
+
+<!-- Load local UMD version -->
+<script src="./lightweight-charts.standalone.production.js"></script>
+
+<script>
+    // --- Main candlestick chart ---
+    const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+        layout: { backgroundColor: '#fff', textColor: '#000' },
+        grid: { vertLines: { color: '#eee' }, horzLines: { color: '#eee' } },
+        rightPriceScale: { borderColor: '#ccc' },
+        timeScale: { borderColor: '#ccc', timeVisible: true, secondsVisible: true },
+    });
+
+    const candleSeries = chart.addCandlestickSeries({
+        upColor: '#4bffb5', downColor: '#ff4976',
+        borderDownColor: '#ff4976', borderUpColor: '#4bffb5',
+        wickDownColor: '#ff4976', wickUpColor: '#4bffb5'
+    });
+
+    // --- Volume histogram chart ---
+    const volumeChart = LightweightCharts.createChart(document.getElementById('volume'), {
+        layout: { backgroundColor: '#fff', textColor: '#000' },
+        grid: { vertLines: { color: '#eee' }, horzLines: { color: '#eee' } },
+        rightPriceScale: { visible: false },
+        timeScale: { visible: false },
+    });
+
+    const volumeSeries = volumeChart.addHistogramSeries({
+        color: '#26a69a',
+        priceFormat: { type: 'volume' },
+        priceScaleId: '',
+    });
+
+    // --- SSE connection ---
+    const evtSource = new EventSource("/stream"); // your backend SSE endpoint
+    evtSource.onmessage = function(e) {
+        try {
+            const msg = JSON.parse(e.data);
+            if (!msg.symbol || !msg.price || !msg.volume24h) return;
+
+            const ts = Math.floor(Date.now() / 1000); // Unix timestamp
+            const price = parseFloat(msg.price);
+            const volume = parseFloat(msg.volume24h);
+
+            // Simple candlestick update: open=high=low=close
+            candleSeries.update({ time: ts, open: price, high: price, low: price, close: price });
+            volumeSeries.update({ time: ts, value: volume, color: price >= 0 ? '#4bffb5' : '#ff4976' });
+
+        } catch(err) {
+            console.error("SSE parse error:", err, e.data);
+        }
+    };
+
+    evtSource.onerror = function(err) {
+        console.error("SSE connection error:", err);
+    };
+
+    // --- Make charts responsive ---
+    function resizeCharts() {
+        const width = window.innerWidth;
+        chart.applyOptions({ width });
+        volumeChart.applyOptions({ width });
+    }
+    window.addEventListener('resize', resizeCharts);
+    resizeCharts(); // initial call
+</script>
+</body>
+</html>

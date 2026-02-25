@@ -7,17 +7,20 @@ import (
 	"time"
 
 	"kopi_susu_gula_aren/config"
-
 	"github.com/gorilla/websocket"
 )
-
-// Symbols yang mau di-track
-var Symbols = []string{"BTCUSDT", "ETHUSDT", "SOLUSDT"}
 
 // lastTicker simpan state terakhir tiap symbol (untuk delta)
 var lastTicker = make(map[string]map[string]string)
 
 func StartStream() {
+	rows, _ := config.ClickDB.Query(config.Ctx, `SELECT token FROM tokens WHERE active = 1`)
+	var Symbols []string
+	for rows.Next() {
+		var sym string
+		rows.Scan(&sym)
+		Symbols = append(Symbols, sym)
+	}
 	conn, _, err := websocket.DefaultDialer.Dial(
 		"wss://stream.bybit.com/v5/public/linear",
 		nil,
